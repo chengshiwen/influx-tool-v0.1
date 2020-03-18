@@ -17,6 +17,7 @@ var (
     Username        string
     Password        string
     Ssl             bool
+    Dir             string
     Cpu             int
     Version         bool
     GitCommit       string
@@ -32,11 +33,12 @@ func main() {
     flag.StringVar(&Username, "username", "", "username to connect to the server")
     flag.StringVar(&Password, "password", "", "password to connect to the server")
     flag.BoolVar(&Ssl, "ssl", false, "use https for requests")
+    flag.StringVar(&Dir, "dir", "export", "directory to export")
     flag.IntVar(&Cpu, "cpu", 1, "cpu number to export")
     flag.BoolVar(&Version, "version", false, "display the version and exit")
     flag.Parse()
     if Version {
-        fmt.Printf("Version:    %s\n", "0.1.0")
+        fmt.Printf("Version:    %s\n", "0.1.1")
         fmt.Printf("Git commit: %s\n", GitCommit)
         fmt.Printf("Go version: %s\n", runtime.Version())
         fmt.Printf("Build time: %s\n", BuildTime)
@@ -46,6 +48,10 @@ func main() {
 
     if Database == "" {
         fmt.Println("database required")
+        return
+    }
+    if err := tool.MakeDir(Dir); err != nil {
+        fmt.Println("invalid dir")
         return
     }
     if Cpu <= 0 || Cpu > runtime.NumCPU() {
@@ -64,10 +70,11 @@ func main() {
     Wg := &sync.WaitGroup{}
     for i, measurement := range measurements {
         Wg.Add(1)
-        go func(measurement string) {
-            tool.Export(backend, Database, measurement)
+        go func(i int, measurement string) {
+            tool.Export(backend, Database, measurement, Dir)
+            fmt.Printf("%d/%d: %s.txt done\n", i+1, len(measurements), measurement)
             defer Wg.Done()
-        }(measurement)
+        }(i, measurement)
         if i + 1 == len(measurements) || (i + 1) % Cpu == 0 {
             Wg.Wait()
         }

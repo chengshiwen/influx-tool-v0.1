@@ -5,11 +5,12 @@ import (
     "github.com/chengshiwen/influx-tool/backend"
     "github.com/influxdata/influxdb1-client/models"
     "io/ioutil"
+    "path/filepath"
     "strings"
     "time"
 )
 
-func Export(be *backend.Backend, db, measurement string) (err error) {
+func Export(be *backend.Backend, db, measurement, dir string) (err error) {
     rsp, err := be.QueryIQL(db, fmt.Sprintf("select * from \"%s\"", measurement))
     if err != nil {
         return
@@ -62,8 +63,7 @@ func Export(be *backend.Backend, db, measurement string) (err error) {
     }
     if len(lines) != 0 {
         data := []byte(strings.Join(lines, "\n") + "\n")
-        ioutil.WriteFile(measurement+".txt", data, 0644)
-        fmt.Printf("%s.txt export done\n", measurement)
+        ioutil.WriteFile(filepath.Join(dir, measurement+".txt"), data, 0644)
     }
     return
 }
