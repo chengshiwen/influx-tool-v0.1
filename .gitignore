@@ -1,0 +1,5 @@
+.idea/
+bin/
+test/
+log/
+.DS_Store
