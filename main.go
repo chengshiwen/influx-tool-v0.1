@@ -38,7 +38,7 @@ func main() {
     flag.BoolVar(&Version, "version", false, "display the version and exit")
     flag.Parse()
     if Version {
-        fmt.Printf("Version:    %s\n", "0.1.1")
+        fmt.Printf("Version:    %s\n", "0.1.2")
         fmt.Printf("Git commit: %s\n", GitCommit)
         fmt.Printf("Go version: %s\n", runtime.Version())
         fmt.Printf("Build time: %s\n", BuildTime)
