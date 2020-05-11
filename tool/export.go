@@ -11,7 +11,7 @@ import (
     "time"
 )
 
-func handleFieldKeys(fieldKeys map[string][]string, castFields map[string][]string) (fieldMap map[string]string, selectKeys string) {
+func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]string) (fieldMap map[string]string, keyClause string) {
     fieldHash := make(map[string]map[string]bool, len(fieldKeys))
     for field, types := range fieldKeys {
         fieldHash[field] = make(map[string]bool, len(types))
@@ -43,7 +43,7 @@ func handleFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
             }
         }
     }
-    selectKeys = strings.Join(selects, ", ")
+    keyClause = strings.Join(selects, ", ")
 
     for ft, fields := range castFields {
         for _, field := range fields {
@@ -72,9 +72,9 @@ func Export(be *backend.Backend, db, measurement, dir string, castFields map[str
         tagMap[t] = true
     }
     fieldKeys := be.GetFieldKeys(db, measurement)
-    fieldMap, selectKeys := handleFieldKeys(fieldKeys, castFields)
+    fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
-    rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\"", selectKeys, measurement))
+    rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\"", keyClause, measurement))
     if err != nil {
         return
     }
