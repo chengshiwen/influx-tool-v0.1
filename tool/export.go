@@ -11,7 +11,7 @@ import (
     "time"
 )
 
-func Export(be *backend.Backend, db, measurement, dir string) (err error) {
+func Export(be *backend.Backend, db, measurement, dir string, castFields map[string][]string) (err error) {
     rsp, err := be.QueryIQL(db, fmt.Sprintf("select * from \"%s\"", measurement))
     if err != nil {
         return
@@ -32,6 +32,13 @@ func Export(be *backend.Backend, db, measurement, dir string) (err error) {
         tagMap[t] = true
     }
     fieldKeys := be.GetFieldKeys(db, measurement)
+    for ft, fields := range castFields {
+        for _, field := range fields {
+            if _, ok := fieldKeys[field]; ok && fieldKeys[field] == "string" {
+                fieldKeys[field] = ft
+            }
+        }
+    }
 
     defer func() {
         if err := recover(); err != nil {

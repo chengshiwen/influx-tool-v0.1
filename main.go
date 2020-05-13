@@ -23,11 +23,30 @@ var (
     Ssl             bool
     Dir             string
     Cpu             int
+    BooleanFields   string
+    FloatFields     string
+    IntegerFields   string
     Version         bool
     GitCommit       string
     BuildTime       string
     Wg              *sync.WaitGroup
 )
+
+func castFields() map[string][]string {
+    booleanFields := make([]string, 0)
+    floatFields := make([]string, 0)
+    integerFields := make([]string, 0)
+    if BooleanFields != "" {
+        booleanFields = tool.String2Array(BooleanFields)
+    }
+    if FloatFields != "" {
+        floatFields = tool.String2Array(FloatFields)
+    }
+    if IntegerFields != "" {
+        integerFields = tool.String2Array(IntegerFields)
+    }
+    return map[string][]string{"boolean": booleanFields, "float": floatFields, "integer": integerFields}
+}
 
 func main() {
     flag.StringVar(&Host, "host", "127.0.0.1", "host to connect to")
@@ -40,10 +59,13 @@ func main() {
     flag.BoolVar(&Ssl, "ssl", false, "use https for requests")
     flag.StringVar(&Dir, "dir", "export", "directory to export")
     flag.IntVar(&Cpu, "cpu", 1, "cpu number to export")
+    flag.StringVar(&BooleanFields, "boolean-fields", "", "fields required to cast to boolean from string, split by ','")
+    flag.StringVar(&FloatFields, "float-fields", "", "fields required to cast to float from string, split by ','")
+    flag.StringVar(&IntegerFields, "integer-fields", "", "fields required to cast to integer from string, split by ','")
     flag.BoolVar(&Version, "version", false, "display the version and exit")
     flag.Parse()
     if Version {
-        fmt.Printf("Version:    %s\n", "0.1.4")
+        fmt.Printf("Version:    %s\n", "0.1.5")
         fmt.Printf("Git commit: %s\n", GitCommit)
         fmt.Printf("Go version: %s\n", runtime.Version())
         fmt.Printf("Build time: %s\n", BuildTime)
@@ -92,6 +114,8 @@ func main() {
         measurements = tool.String2Array(Measurements)
     }
 
+    castFields := castFields()
+
     cnt := 0
     Wg := &sync.WaitGroup{}
     for i, measurement := range measurements {
@@ -101,7 +125,7 @@ func main() {
         cnt++
         Wg.Add(1)
         go func(i int, measurement string) {
-            tool.Export(backend, Database, measurement, Dir)
+            tool.Export(backend, Database, measurement, Dir, castFields)
             fmt.Printf("%d/%d: %s processed\n", i+1, len(measurements), measurement)
             defer Wg.Done()
         }(i, measurement)
