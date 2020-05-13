@@ -43,7 +43,7 @@ func main() {
     flag.BoolVar(&Version, "version", false, "display the version and exit")
     flag.Parse()
     if Version {
-        fmt.Printf("Version:    %s\n", "0.1.3")
+        fmt.Printf("Version:    %s\n", "0.1.4")
         fmt.Printf("Git commit: %s\n", GitCommit)
         fmt.Printf("Go version: %s\n", runtime.Version())
         fmt.Printf("Build time: %s\n", BuildTime)
@@ -102,7 +102,7 @@ func main() {
         Wg.Add(1)
         go func(i int, measurement string) {
             tool.Export(backend, Database, measurement, Dir)
-            fmt.Printf("%d/%d: %s.txt done\n", i+1, len(measurements), measurement)
+            fmt.Printf("%d/%d: %s processed\n", i+1, len(measurements), measurement)
             defer Wg.Done()
         }(i, measurement)
         if cnt % Cpu == 0 || i == len(measurements)-1 || i == rangeEnd-1 {

@@ -132,7 +132,16 @@ func (backend *Backend) GetFieldKeys(db, measure string) map[string]string {
     fieldKeys := make(map[string]string)
     for _, s := range series {
         for _, v := range s.Values {
-            fieldKeys[v[0].(string)] = v[1].(string)
+            fk := v[0].(string)
+            ft := v[1].(string)
+            if _, ok := fieldKeys[fk]; !ok {
+                fieldKeys[fk] = ft
+            } else {
+                // TODO: support multi data type
+                if fieldKeys[fk] == "string" && ft != "string" {
+                    fieldKeys[fk] = ft
+                }
+            }
         }
     }
     return fieldKeys

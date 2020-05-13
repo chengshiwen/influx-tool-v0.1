@@ -32,6 +32,12 @@ func Export(be *backend.Backend, db, measurement, dir string) (err error) {
     }
     fieldKeys := be.GetFieldKeys(db, measurement)
 
+    defer func() {
+        if err := recover(); err != nil {
+            fmt.Printf("multi data type error from %s on %s: %s\n", err, db, measurement)
+        }
+    }()
+
     var lines []string
     for _, value := range series[0].Values {
         mtagSet := []string{EscapeMeasurement(measurement)}
@@ -48,7 +54,7 @@ func Export(be *backend.Backend, db, measurement, dir string) (err error) {
                     if vtype == "float" || vtype == "boolean" {
                         fieldSet = append(fieldSet, fmt.Sprintf("%s=%v", EscapeTag(k), v))
                     } else if vtype == "integer" {
-                        fieldSet = append(fieldSet, fmt.Sprintf("%s=%di", EscapeTag(k), int64(v.(float64))))
+                        fieldSet = append(fieldSet, fmt.Sprintf("%s=%vi", EscapeTag(k), v))
                     } else if vtype == "string" {
                         fieldSet = append(fieldSet, fmt.Sprintf("%s=\"%s\"", EscapeTag(k), models.EscapeStringField(v.(string))))
                     }
