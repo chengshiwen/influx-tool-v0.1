@@ -4,6 +4,7 @@ import (
     "fmt"
     "github.com/chengshiwen/influx-tool/backend"
     "github.com/influxdata/influxdb1-client/models"
+    "github.com/influxdata/influxql"
     "io/ioutil"
     "path/filepath"
     "strings"
@@ -39,6 +40,13 @@ func Export(be *backend.Backend, db, measurement, dir string) (err error) {
     }()
 
     var lines []string
+    lines = append(lines,
+        "# DDL",
+        fmt.Sprintf("CREATE DATABASE %s WITH NAME autogen", influxql.QuoteIdent(db)),
+        "# DML",
+        fmt.Sprintf("# CONTEXT-DATABASE:%s", db),
+        "# CONTEXT-RETENTION-POLICY:autogen",
+    )
     for _, value := range series[0].Values {
         mtagSet := []string{EscapeMeasurement(measurement)}
         fieldSet := make([]string, 0)
