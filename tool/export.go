@@ -11,8 +11,60 @@ import (
     "time"
 )
 
+func handleFieldKeys(fieldKeys map[string][]string, castFields map[string][]string) (fieldMap map[string]string, selectKeys string) {
+    fieldHash := make(map[string]map[string]bool, len(fieldKeys))
+    for field, types := range fieldKeys {
+        fieldHash[field] = make(map[string]bool, len(types))
+        for _, t := range types {
+            fieldHash[field][t] = true
+        }
+    }
+    fieldMap = make(map[string]string, len(fieldKeys))
+    selects := []string{"*"}
+    for field, types := range fieldKeys {
+        if len(types) == 1 {
+            fieldMap[field] = types[0]
+        } else {
+            tmap := fieldHash[field]
+            _, fok := tmap["float"]
+            _, iok := tmap["integer"]
+            if fok || iok {
+                if fok {
+                    fieldMap[field] = "float"
+                } else {
+                    fieldMap[field] = "integer"
+                }
+                if _, ok := tmap["string"]; ok {
+                    selects = append(selects, fmt.Sprintf("\"%s\"::string", field))
+                }
+            } else {
+                fieldMap[field] = "boolean"
+                selects = append(selects, fmt.Sprintf("\"%s\"::boolean", field))
+            }
+        }
+    }
+    selectKeys = strings.Join(selects, ", ")
+
+    for ft, fields := range castFields {
+        for _, field := range fields {
+            if _, ok := fieldKeys[field]; ok && fieldMap[field] == "string" {
+                fieldMap[field] = ft
+            }
+        }
+    }
+    return
+}
+
 func Export(be *backend.Backend, db, measurement, dir string, castFields map[string][]string) (err error) {
-    rsp, err := be.QueryIQL(db, fmt.Sprintf("select * from \"%s\"", measurement))
+    tagKeys := be.GetTagKeys(db, measurement)
+    tagMap := make(map[string]bool)
+    for _, t := range tagKeys {
+        tagMap[t] = true
+    }
+    fieldKeys := be.GetFieldKeys(db, measurement)
+    fieldMap, selectKeys := handleFieldKeys(fieldKeys, castFields)
+
+    rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\"", selectKeys, measurement))
     if err != nil {
         return
     }
@@ -25,20 +77,6 @@ func Export(be *backend.Backend, db, measurement, dir string, castFields map[str
         return
     }
     columns := series[0].Columns
-
-    tagKeys := be.GetTagKeys(db, measurement)
-    tagMap := make(map[string]bool, 0)
-    for _, t := range tagKeys {
-        tagMap[t] = true
-    }
-    fieldKeys := be.GetFieldKeys(db, measurement)
-    for ft, fields := range castFields {
-        for _, field := range fields {
-            if _, ok := fieldKeys[field]; ok && fieldKeys[field] == "string" {
-                fieldKeys[field] = ft
-            }
-        }
-    }
 
     defer func() {
         if err := recover(); err != nil {
@@ -54,6 +92,7 @@ func Export(be *backend.Backend, db, measurement, dir string, castFields map[str
         fmt.Sprintf("# CONTEXT-DATABASE:%s", db),
         "# CONTEXT-RETENTION-POLICY:autogen",
     )
+    headerTotal := 1 + len(tagKeys) + len(fieldKeys)
     for _, value := range series[0].Values {
         mtagSet := []string{EscapeMeasurement(measurement)}
         fieldSet := make([]string, 0)
@@ -64,8 +103,13 @@ func Export(be *backend.Backend, db, measurement, dir string, castFields map[str
                 if v != nil {
                     mtagSet = append(mtagSet, fmt.Sprintf("%s=%s", EscapeTag(k), EscapeTag(v.(string))))
                 }
-            } else if vtype, ok := fieldKeys[k]; ok {
-                if v != nil {
+            } else {
+                if i >= headerTotal {
+                    if idx := strings.LastIndex(k, "_"); idx > -1 {
+                        k = k[:idx]
+                    }
+                }
+                if vtype, ok := fieldMap[k]; ok && v != nil {
                     if vtype == "float" || vtype == "boolean" {
                         fieldSet = append(fieldSet, fmt.Sprintf("%s=%v", EscapeTag(k), v))
                     } else if vtype == "integer" {

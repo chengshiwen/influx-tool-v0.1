@@ -125,23 +125,16 @@ func (backend *Backend) GetTagKeys(db, measure string) []string {
     return backend.GetSeriesValues(db, fmt.Sprintf("show tag keys from \"%s\"", measure))
 }
 
-func (backend *Backend) GetFieldKeys(db, measure string) map[string]string {
+func (backend *Backend) GetFieldKeys(db, measure string) map[string][]string {
     query := fmt.Sprintf("show field keys from \"%s\"", measure)
     p, _ := backend.Query(NewRequest(db, query))
     series, _ := SeriesFromResponseBytes(p)
-    fieldKeys := make(map[string]string)
+    fieldKeys := make(map[string][]string)
     for _, s := range series {
         for _, v := range s.Values {
             fk := v[0].(string)
             ft := v[1].(string)
-            if _, ok := fieldKeys[fk]; !ok {
-                fieldKeys[fk] = ft
-            } else {
-                // TODO: support multi data type
-                if fieldKeys[fk] == "string" && ft != "string" {
-                    fieldKeys[fk] = ft
-                }
-            }
+            fieldKeys[fk] = append(fieldKeys[fk], ft)
         }
     }
     return fieldKeys
