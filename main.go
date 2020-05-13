@@ -5,7 +5,10 @@ import (
     "fmt"
     "github.com/chengshiwen/influx-tool/backend"
     "github.com/chengshiwen/influx-tool/tool"
+    "io/ioutil"
     "math"
+    "os/exec"
+    "path/filepath"
     "regexp"
     "runtime"
     "strconv"
@@ -23,6 +26,7 @@ var (
     Ssl             bool
     Dir             string
     Cpu             int
+    Merge           bool
     BooleanFields   string
     FloatFields     string
     IntegerFields   string
@@ -59,13 +63,14 @@ func main() {
     flag.BoolVar(&Ssl, "ssl", false, "use https for requests")
     flag.StringVar(&Dir, "dir", "export", "directory to export")
     flag.IntVar(&Cpu, "cpu", 1, "cpu number to export")
+    flag.BoolVar(&Merge, "merge", false, "merge and export into one file")
     flag.StringVar(&BooleanFields, "boolean-fields", "", "fields required to cast to boolean from string, split by ','")
     flag.StringVar(&FloatFields, "float-fields", "", "fields required to cast to float from string, split by ','")
     flag.StringVar(&IntegerFields, "integer-fields", "", "fields required to cast to integer from string, split by ','")
     flag.BoolVar(&Version, "version", false, "display the version and exit")
     flag.Parse()
     if Version {
-        fmt.Printf("Version:    %s\n", "0.1.5")
+        fmt.Printf("Version:    %s\n", "0.1.6")
         fmt.Printf("Git commit: %s\n", GitCommit)
         fmt.Printf("Go version: %s\n", runtime.Version())
         fmt.Printf("Build time: %s\n", BuildTime)
@@ -125,7 +130,7 @@ func main() {
         cnt++
         Wg.Add(1)
         go func(i int, measurement string) {
-            tool.Export(backend, Database, measurement, Dir, castFields)
+            tool.Export(backend, Database, measurement, Dir, castFields, Merge)
             fmt.Printf("%d/%d: %s processed\n", i+1, len(measurements), measurement)
             defer Wg.Done()
         }(i, measurement)
@@ -134,4 +139,17 @@ func main() {
         }
     }
     fmt.Printf("%d/%d measurements export done\n", cnt, len(measurements))
+    if Merge {
+        ioutil.WriteFile(filepath.Join(Dir, "merge.tmp"), []byte(tool.GetDMLHeader(Database)+"\n"), 0644)
+        err := exec.Command("sh", "-c", fmt.Sprintf("cat %s >> %s", filepath.Join(Dir, "*.txt"), filepath.Join(Dir, "merge.tmp"))).Run()
+        if err != nil {
+            fmt.Printf("merge error: %s\n", err)
+            return
+        }
+        err = exec.Command("sh", "-c", fmt.Sprintf("cd %s && rm -f *.txt && mv merge.tmp merge.txt", Dir)).Run()
+        if err != nil {
+            fmt.Printf("rename error: %s\n", err)
+            return
+        }
+    }
 }

@@ -55,7 +55,17 @@ func handleFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
     return
 }
 
-func Export(be *backend.Backend, db, measurement, dir string, castFields map[string][]string) (err error) {
+func GetDMLHeader(db string) string {
+    return strings.Join([]string{
+        "# DDL",
+        fmt.Sprintf("CREATE DATABASE %s WITH NAME autogen", influxql.QuoteIdent(db)),
+        "# DML",
+        fmt.Sprintf("# CONTEXT-DATABASE:%s", db),
+        "# CONTEXT-RETENTION-POLICY:autogen",
+    }, "\n")
+}
+
+func Export(be *backend.Backend, db, measurement, dir string, castFields map[string][]string, merge bool) (err error) {
     tagKeys := be.GetTagKeys(db, measurement)
     tagMap := make(map[string]bool)
     for _, t := range tagKeys {
@@ -85,13 +95,9 @@ func Export(be *backend.Backend, db, measurement, dir string, castFields map[str
     }()
 
     var lines []string
-    lines = append(lines,
-        "# DDL",
-        fmt.Sprintf("CREATE DATABASE %s WITH NAME autogen", influxql.QuoteIdent(db)),
-        "# DML",
-        fmt.Sprintf("# CONTEXT-DATABASE:%s", db),
-        "# CONTEXT-RETENTION-POLICY:autogen",
-    )
+    if !merge {
+        lines = append(lines, GetDMLHeader(db))
+    }
     headerTotal := 1 + len(tagKeys) + len(fieldKeys)
     for _, value := range series[0].Values {
         mtagSet := []string{EscapeMeasurement(measurement)}
@@ -127,7 +133,7 @@ func Export(be *backend.Backend, db, measurement, dir string, castFields map[str
         lines = append(lines, line)
     }
     if len(lines) != 0 {
-        data := []byte(strings.Join(lines, "\n") + "\n")
+        data := []byte(strings.Join(lines, "\n")+"\n")
         ioutil.WriteFile(filepath.Join(dir, measurement+".txt"), data, 0644)
     }
     return
