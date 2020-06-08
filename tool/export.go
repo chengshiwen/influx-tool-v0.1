@@ -30,6 +30,7 @@ func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
             _, iok := tmap["integer"]
             if fok || iok {
                 if fok {
+                    // force cast to float whether there is an integer
                     fieldMap[field] = "float"
                 } else {
                     fieldMap[field] = "integer"
@@ -37,6 +38,7 @@ func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
                 if _, ok := tmap["string"]; ok {
                     selects = append(selects, fmt.Sprintf("\"%s\"::string", field))
                 }
+                // discard boolean
             } else {
                 fieldMap[field] = "boolean"
                 selects = append(selects, fmt.Sprintf("\"%s\"::boolean", field))

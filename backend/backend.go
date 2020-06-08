@@ -133,8 +133,7 @@ func (backend *Backend) GetFieldKeys(db, measure string) map[string][]string {
     for _, s := range series {
         for _, v := range s.Values {
             fk := v[0].(string)
-            ft := v[1].(string)
-            fieldKeys[fk] = append(fieldKeys[fk], ft)
+            fieldKeys[fk] = append(fieldKeys[fk], v[1].(string))
         }
     }
     return fieldKeys
