@@ -1,12 +1,14 @@
 package util
 
 import (
+	"encoding/csv"
 	"fmt"
 	"github.com/chengshiwen/influx-tool/backend"
 	"github.com/deckarep/golang-set"
 	"github.com/influxdata/influxdb1-client/models"
 	"github.com/influxdata/influxql"
 	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -139,5 +141,83 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 		data := []byte(strings.Join(lines, "\n") + "\n")
 		ioutil.WriteFile(filepath.Join(dir, measurement+".txt"), data, 0644)
 	}
+	return
+}
+
+func ExportCsv(be *backend.Backend, db, measurement string, start, end int64, dir string, castFields map[string][]string) (err error) {
+	timeClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
+
+	tagKeys := be.GetTagKeys(db, measurement)
+	tagMap := NewSetFromStrSlice(tagKeys)
+	fieldKeys := be.GetFieldKeys(db, measurement)
+	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
+
+	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\" %s", keyClause, measurement, timeClause))
+	if err != nil {
+		return
+	}
+	series, err := backend.SeriesFromResponseBytes(rsp)
+	if err != nil {
+		return
+	}
+	if len(series) < 1 {
+		fmt.Printf("select empty data from %s on %s\n", db, measurement)
+		return
+	}
+	columns := series[0].Columns
+
+	defer func() {
+		if err := recover(); err != nil {
+			fmt.Printf("export panic from %s on %s: %s\n", err, db, measurement)
+		}
+	}()
+
+	w, err := os.Create(filepath.Join(dir, measurement+".csv"))
+	if err != nil {
+		panic(err)
+	}
+	defer w.Close()
+	w.WriteString("\xEF\xBB\xBF")
+	csvw := csv.NewWriter(w)
+	headerTotal := 1 + len(tagKeys) + len(fieldKeys)
+	csvHeaders := append([]string{"name"}, columns[:headerTotal]...)
+	csvw.Write(csvHeaders)
+
+	for _, value := range series[0].Values {
+		records := make([]string, 0, headerTotal+1)
+		ts, _ := time.Parse(time.RFC3339Nano, value[0].(string))
+		records = append(records, measurement)
+		records = append(records, fmt.Sprintf("%d", ts.UnixNano()))
+		smap := make(map[string]string, len(tagKeys)+len(fieldKeys))
+		for i := 1; i < len(value); i++ {
+			k := columns[i]
+			v := value[i]
+			if tagMap.Contains(k) {
+				if v != nil {
+					smap[k] = v.(string)
+				} else {
+					smap[k] = ""
+				}
+			} else {
+				if i >= headerTotal {
+					if idx := strings.LastIndex(k, "_"); idx > -1 {
+						k = k[:idx]
+					}
+				}
+				if _, ok := fieldMap[k]; ok {
+					if v != nil {
+						smap[k] = fmt.Sprintf("%v", v)
+					} else {
+						smap[k] = ""
+					}
+				}
+			}
+		}
+		for i := 1; i < headerTotal; i++ {
+			records = append(records, smap[columns[i]])
+		}
+		csvw.Write(records)
+	}
+	csvw.Flush()
 	return
 }

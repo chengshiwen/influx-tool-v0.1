@@ -24,6 +24,7 @@ var (
 	Range         string
 	Start         string
 	End           string
+	Format        string
 	Username      string
 	Password      string
 	Ssl           bool
@@ -63,6 +64,7 @@ func main() {
 	flag.StringVar(&Range, "range", "", "measurements range to export, as 'start,end', started from 1, included end\nignored when -measurements not empty")
 	flag.StringVar(&Start, "start", "", "the start unix time to export (second precision), optional")
 	flag.StringVar(&End, "end", "", "the end unix time to export (second precision), optional")
+	flag.StringVar(&Format, "format", "line", "the output format to export, valid values are line or csv")
 	flag.StringVar(&Username, "username", "", "username to connect to the server")
 	flag.StringVar(&Password, "password", "", "password to connect to the server")
 	flag.BoolVar(&Ssl, "ssl", false, "use https for requests")
@@ -75,7 +77,7 @@ func main() {
 	flag.BoolVar(&Version, "version", false, "display the version and exit")
 	flag.Parse()
 	if Version {
-		fmt.Printf("Version:    %s\n", "0.1.6")
+		fmt.Printf("Version:    %s\n", "0.1.7")
 		fmt.Printf("Git commit: %s\n", GitCommit)
 		fmt.Printf("Go version: %s\n", runtime.Version())
 		fmt.Printf("Build time: %s\n", BuildTime)
@@ -95,6 +97,11 @@ func main() {
 		fmt.Println("invalid cpu")
 		return
 	}
+	if Format != "line" && Format != "csv" {
+		fmt.Println("invalid format")
+		return
+	}
+
 	rangeStart := 1
 	rangeEnd := math.MaxUint32
 	if Measurements == "" && Range != "" {
@@ -163,7 +170,11 @@ func main() {
 		cnt++
 		Wg.Add(1)
 		go func(i int, measurement string) {
-			util.Export(backend, Database, measurement, StartTime, EndTime, Dir, castFields, Merge)
+			if Format == "csv" {
+				util.ExportCsv(backend, Database, measurement, StartTime, EndTime, Dir, castFields)
+			} else {
+				util.Export(backend, Database, measurement, StartTime, EndTime, Dir, castFields, Merge)
+			}
 			fmt.Printf("%d/%d: %s processed\n", i+1, len(measurements), measurement)
 			defer Wg.Done()
 		}(i, measurement)
@@ -172,7 +183,7 @@ func main() {
 		}
 	}
 	fmt.Printf("%d/%d measurements export done\n", cnt, len(measurements))
-	if Merge {
+	if Format == "line" && Merge {
 		ioutil.WriteFile(filepath.Join(Dir, "merge.tmp"), []byte(util.GetDMLHeader(Database)+"\n"), 0644)
 		err := exec.Command("sh", "-c", fmt.Sprintf("cat %s >> %s", filepath.Join(Dir, "*.txt"), filepath.Join(Dir, "merge.tmp"))).Run()
 		if err != nil {
