@@ -22,6 +22,8 @@ var (
 	Database      string
 	Measurements  string
 	Range         string
+	Start         string
+	End           string
 	Username      string
 	Password      string
 	Ssl           bool
@@ -59,6 +61,8 @@ func main() {
 	flag.StringVar(&Database, "database", "", "database to connect to the server")
 	flag.StringVar(&Measurements, "measurements", "", "measurements split by ',' while return all measurements if empty\nwildcard '*' and '?' supported")
 	flag.StringVar(&Range, "range", "", "measurements range to export, as 'start,end', started from 1, included end\nignored when -measurements not empty")
+	flag.StringVar(&Start, "start", "", "the start unix time to export (second precision), optional")
+	flag.StringVar(&End, "end", "", "the end unix time to export (second precision), optional")
 	flag.StringVar(&Username, "username", "", "username to connect to the server")
 	flag.StringVar(&Password, "password", "", "password to connect to the server")
 	flag.BoolVar(&Ssl, "ssl", false, "use https for requests")
@@ -112,6 +116,18 @@ func main() {
 		}
 	}
 
+	var StartTime, EndTime int64
+	if i, err := strconv.ParseInt(Start, 10, 64); err == nil {
+		StartTime = i
+	} else {
+		StartTime = 0
+	}
+	if i, err := strconv.ParseInt(End, 10, 64); err == nil {
+		EndTime = i
+	} else {
+		EndTime = 9223372036
+	}
+
 	backend := backend.NewBackend(Host, Port, Username, Password, Ssl)
 	measurements := make([]string, 0)
 	if Measurements == "" {
@@ -147,7 +163,7 @@ func main() {
 		cnt++
 		Wg.Add(1)
 		go func(i int, measurement string) {
-			util.Export(backend, Database, measurement, Dir, castFields, Merge)
+			util.Export(backend, Database, measurement, StartTime, EndTime, Dir, castFields, Merge)
 			fmt.Printf("%d/%d: %s processed\n", i+1, len(measurements), measurement)
 			defer Wg.Done()
 		}(i, measurement)

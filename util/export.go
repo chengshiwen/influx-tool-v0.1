@@ -69,13 +69,15 @@ func GetDMLHeader(db string) string {
 	}, "\n")
 }
 
-func Export(be *backend.Backend, db, measurement, dir string, castFields map[string][]string, merge bool) (err error) {
+func Export(be *backend.Backend, db, measurement string, start, end int64, dir string, castFields map[string][]string, merge bool) (err error) {
+	timeClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
+
 	tagKeys := be.GetTagKeys(db, measurement)
 	tagMap := NewSetFromStrSlice(tagKeys)
 	fieldKeys := be.GetFieldKeys(db, measurement)
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
-	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\"", keyClause, measurement))
+	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\" %s", keyClause, measurement, timeClause))
 	if err != nil {
 		return
 	}
