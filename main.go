@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 	"strconv"
+	"strings"
 	"sync"
 )
 
@@ -56,7 +57,7 @@ func main() {
 	flag.StringVar(&Host, "host", "127.0.0.1", "host to connect to")
 	flag.IntVar(&Port, "port", 8086, "port to connect to")
 	flag.StringVar(&Database, "database", "", "database to connect to the server")
-	flag.StringVar(&Measurements, "measurements", "", "measurements split by ',' while return all measurements if empty")
+	flag.StringVar(&Measurements, "measurements", "", "measurements split by ',' while return all measurements if empty\nwildcard '*' and '?' supported")
 	flag.StringVar(&Range, "range", "", "measurements range to export, as 'start,end', started from 1, included end\nignored when -measurements not empty")
 	flag.StringVar(&Username, "username", "", "username to connect to the server")
 	flag.StringVar(&Password, "password", "", "password to connect to the server")
@@ -116,7 +117,23 @@ func main() {
 	if Measurements == "" {
 		measurements = backend.GetMeasurements(Database)
 	} else {
-		measurements = util.String2Array(Measurements)
+		if strings.Contains(Measurements, "*") || strings.Contains(Measurements, "?") {
+			patterns := util.String2Array(Measurements)
+			allMeases := backend.GetMeasurements(Database)
+			for _, meas := range allMeases {
+				for _, pat := range patterns {
+					if strings.Contains(pat, "*") || strings.Contains(pat, "?") {
+						if util.WildcardMatch(pat, meas) {
+							measurements = append(measurements, meas)
+						}
+					} else if meas == pat {
+						measurements = append(measurements, meas)
+					}
+				}
+			}
+		} else {
+			measurements = util.String2Array(Measurements)
+		}
 	}
 
 	castFields := castFields()
