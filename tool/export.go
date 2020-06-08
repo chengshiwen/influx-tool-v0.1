@@ -3,6 +3,7 @@ package tool
 import (
     "fmt"
     "github.com/chengshiwen/influx-tool/backend"
+    "github.com/deckarep/golang-set"
     "github.com/influxdata/influxdb1-client/models"
     "github.com/influxdata/influxql"
     "io/ioutil"
@@ -12,12 +13,12 @@ import (
 )
 
 func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]string) (fieldMap map[string]string, keyClause string) {
-    fieldHash := make(map[string]map[string]bool, len(fieldKeys))
+    // The SELECT statement returns all field values if all values have the same type.
+    // If field value types differ across shards, InfluxDB first performs any applicable cast operations and
+    // then returns all values with the type that occurs first in the following list: float, integer, string, boolean.
+    fieldSet := make(map[string]mapset.Set, len(fieldKeys))
     for field, types := range fieldKeys {
-        fieldHash[field] = make(map[string]bool, len(types))
-        for _, t := range types {
-            fieldHash[field][t] = true
-        }
+        fieldSet[field] = NewSetFromStrSlice(types)
     }
     fieldMap = make(map[string]string, len(fieldKeys))
     selects := []string{"*"}
@@ -25,9 +26,10 @@ func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
         if len(types) == 1 {
             fieldMap[field] = types[0]
         } else {
-            tmap := fieldHash[field]
-            _, fok := tmap["float"]
-            _, iok := tmap["integer"]
+            tmap := fieldSet[field]
+            fok := tmap.Contains("float")
+            iok := tmap.Contains("integer")
+            sok := tmap.Contains("string")
             if fok || iok {
                 if fok {
                     // force cast to float whether there is an integer
@@ -35,7 +37,7 @@ func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
                 } else {
                     fieldMap[field] = "integer"
                 }
-                if _, ok := tmap["string"]; ok {
+                if sok {
                     selects = append(selects, fmt.Sprintf("\"%s\"::string", field))
                 }
                 // discard boolean
@@ -69,10 +71,7 @@ func GetDMLHeader(db string) string {
 
 func Export(be *backend.Backend, db, measurement, dir string, castFields map[string][]string, merge bool) (err error) {
     tagKeys := be.GetTagKeys(db, measurement)
-    tagMap := make(map[string]bool)
-    for _, t := range tagKeys {
-        tagMap[t] = true
-    }
+    tagMap := NewSetFromStrSlice(tagKeys)
     fieldKeys := be.GetFieldKeys(db, measurement)
     fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
@@ -107,7 +106,7 @@ func Export(be *backend.Backend, db, measurement, dir string, castFields map[str
         for i := 1; i < len(value); i++ {
             k := columns[i]
             v := value[i]
-            if _, ok := tagMap[k]; ok {
+            if tagMap.Contains(k) {
                 if v != nil {
                     mtagSet = append(mtagSet, fmt.Sprintf("%s=%s", EscapeTag(k), EscapeTag(v.(string))))
                 }
