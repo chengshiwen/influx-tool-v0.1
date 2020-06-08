@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/chengshiwen/influx-tool/backend"
-	"github.com/chengshiwen/influx-tool/tool"
+	"github.com/chengshiwen/influx-tool/util"
 	"io/ioutil"
 	"math"
 	"os/exec"
@@ -41,13 +41,13 @@ func castFields() map[string][]string {
 	floatFields := make([]string, 0)
 	integerFields := make([]string, 0)
 	if BooleanFields != "" {
-		booleanFields = tool.String2Array(BooleanFields)
+		booleanFields = util.String2Array(BooleanFields)
 	}
 	if FloatFields != "" {
-		floatFields = tool.String2Array(FloatFields)
+		floatFields = util.String2Array(FloatFields)
 	}
 	if IntegerFields != "" {
-		integerFields = tool.String2Array(IntegerFields)
+		integerFields = util.String2Array(IntegerFields)
 	}
 	return map[string][]string{"boolean": booleanFields, "float": floatFields, "integer": integerFields}
 }
@@ -82,7 +82,7 @@ func main() {
 		fmt.Println("database required")
 		return
 	}
-	if err := tool.MakeDir(Dir); err != nil {
+	if err := util.MakeDir(Dir); err != nil {
 		fmt.Println("invalid dir")
 		return
 	}
@@ -116,7 +116,7 @@ func main() {
 	if Measurements == "" {
 		measurements = backend.GetMeasurements(Database)
 	} else {
-		measurements = tool.String2Array(Measurements)
+		measurements = util.String2Array(Measurements)
 	}
 
 	castFields := castFields()
@@ -130,7 +130,7 @@ func main() {
 		cnt++
 		Wg.Add(1)
 		go func(i int, measurement string) {
-			tool.Export(backend, Database, measurement, Dir, castFields, Merge)
+			util.Export(backend, Database, measurement, Dir, castFields, Merge)
 			fmt.Printf("%d/%d: %s processed\n", i+1, len(measurements), measurement)
 			defer Wg.Done()
 		}(i, measurement)
@@ -140,7 +140,7 @@ func main() {
 	}
 	fmt.Printf("%d/%d measurements export done\n", cnt, len(measurements))
 	if Merge {
-		ioutil.WriteFile(filepath.Join(Dir, "merge.tmp"), []byte(tool.GetDMLHeader(Database)+"\n"), 0644)
+		ioutil.WriteFile(filepath.Join(Dir, "merge.tmp"), []byte(util.GetDMLHeader(Database)+"\n"), 0644)
 		err := exec.Command("sh", "-c", fmt.Sprintf("cat %s >> %s", filepath.Join(Dir, "*.txt"), filepath.Join(Dir, "merge.tmp"))).Run()
 		if err != nil {
 			fmt.Printf("merge error: %s\n", err)
