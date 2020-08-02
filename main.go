@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/chengshiwen/influx-tool/backend"
 	"github.com/chengshiwen/influx-tool/util"
+	"github.com/panjf2000/ants/v2"
 	"io/ioutil"
 	"math"
 	"os/exec"
@@ -37,6 +38,7 @@ var (
 	Version       bool
 	GitCommit     string
 	BuildTime     string
+	Pool          *ants.Pool
 	Wg            *sync.WaitGroup
 )
 
@@ -162,26 +164,27 @@ func main() {
 	castFields := castFields()
 
 	cnt := 0
+	Pool, _ := ants.NewPool(Cpu)
+	defer Pool.Release()
 	Wg := &sync.WaitGroup{}
 	for i, measurement := range measurements {
-		if Range != "" && (i < rangeStart-1 || i >= rangeEnd) {
+		_i, _measurement := i, measurement
+		if Range != "" && (_i < rangeStart-1 || _i >= rangeEnd) {
 			continue
 		}
 		cnt++
 		Wg.Add(1)
-		go func(i int, measurement string) {
-			if Format == "csv" {
-				util.ExportCsv(backend, Database, measurement, StartTime, EndTime, Dir, castFields)
-			} else {
-				util.Export(backend, Database, measurement, StartTime, EndTime, Dir, castFields, Merge)
-			}
-			fmt.Printf("%d/%d: %s processed\n", i+1, len(measurements), measurement)
+		Pool.Submit(func() {
 			defer Wg.Done()
-		}(i, measurement)
-		if cnt%Cpu == 0 || i == len(measurements)-1 || i == rangeEnd-1 {
-			Wg.Wait()
-		}
+			if Format == "csv" {
+				util.ExportCsv(backend, Database, _measurement, StartTime, EndTime, Dir, castFields)
+			} else {
+				util.Export(backend, Database, _measurement, StartTime, EndTime, Dir, castFields, Merge)
+			}
+			fmt.Printf("%d/%d: %s processed\n", _i+1, len(measurements), _measurement)
+		})
 	}
+	Wg.Wait()
 	fmt.Printf("%d/%d measurements export done\n", cnt, len(measurements))
 	if Format == "line" && Merge {
 		ioutil.WriteFile(filepath.Join(Dir, "merge.tmp"), []byte(util.GetDMLHeader(Database)+"\n"), 0644)
