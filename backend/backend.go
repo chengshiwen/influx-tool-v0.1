@@ -2,9 +2,9 @@ package backend
 
 import (
 	"bytes"
-	"compress/gzip"
 	"crypto/tls"
 	"fmt"
+	gzip "github.com/klauspost/pgzip"
 	"io"
 	"io/ioutil"
 	"log"
