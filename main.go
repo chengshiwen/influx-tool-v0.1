@@ -70,7 +70,7 @@ func main() {
 	flag.BoolVar(&Ssl, "ssl", false, "use https for requests")
 	flag.StringVar(&Dir, "dir", "export", "directory to export")
 	flag.IntVar(&Cpu, "cpu", 1, "cpu number to export")
-	flag.BoolVar(&Merge, "merge", false, "merge and export into one file")
+	flag.BoolVar(&Merge, "merge", false, "merge and export into one file, ignored when -format is not line")
 	flag.StringVar(&BooleanFields, "boolean-fields", "", "fields required to cast to boolean from string, split by ','")
 	flag.StringVar(&FloatFields, "float-fields", "", "fields required to cast to float from string, split by ','")
 	flag.StringVar(&IntegerFields, "integer-fields", "", "fields required to cast to integer from string, split by ','")
