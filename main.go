@@ -30,7 +30,7 @@ var (
 	Password      string
 	Ssl           bool
 	Dir           string
-	Cpu           int
+	Worker        int
 	Merge         bool
 	BooleanFields string
 	FloatFields   string
@@ -71,7 +71,7 @@ func main() {
 	flag.StringVar(&Password, "password", "", "password to connect to the server")
 	flag.BoolVar(&Ssl, "ssl", false, "use https for requests")
 	flag.StringVar(&Dir, "dir", "export", "directory to export")
-	flag.IntVar(&Cpu, "cpu", 1, "cpu number to export")
+	flag.IntVar(&Worker, "worker", 1, "number of concurrent workers to export")
 	flag.BoolVar(&Merge, "merge", false, "merge and export into one file, ignored when -format is not line")
 	flag.StringVar(&BooleanFields, "boolean-fields", "", "fields required to cast to boolean from string, split by ','")
 	flag.StringVar(&FloatFields, "float-fields", "", "fields required to cast to float from string, split by ','")
@@ -79,7 +79,7 @@ func main() {
 	flag.BoolVar(&Version, "version", false, "display the version and exit")
 	flag.Parse()
 	if Version {
-		fmt.Printf("Version:    %s\n", "0.1.7")
+		fmt.Printf("Version:    %s\n", "0.1.8")
 		fmt.Printf("Git commit: %s\n", GitCommit)
 		fmt.Printf("Go version: %s\n", runtime.Version())
 		fmt.Printf("Build time: %s\n", BuildTime)
@@ -95,8 +95,8 @@ func main() {
 		fmt.Println("invalid dir")
 		return
 	}
-	if Cpu <= 0 || Cpu > runtime.NumCPU() {
-		fmt.Println("invalid cpu")
+	if Worker <= 0 || Worker > 4*runtime.NumCPU() {
+		fmt.Println("invalid worker, not more than 4*cpus")
 		return
 	}
 	if Format != "line" && Format != "csv" {
@@ -164,7 +164,7 @@ func main() {
 	castFields := castFields()
 
 	cnt := 0
-	Pool, _ := ants.NewPool(Cpu)
+	Pool, _ := ants.NewPool(Worker)
 	defer Pool.Release()
 	Wg := &sync.WaitGroup{}
 	for i, measurement := range measurements {
