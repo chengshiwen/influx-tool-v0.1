@@ -3,14 +3,16 @@
 ## Author: Shiwen Cheng
 ## Copyright: 2020, <chengshiwen0103@gmail.com>
 
+export GO_BUILD=env GO111MODULE=on go build -o bin/influx-tool -ldflags "-X main.GitCommit=$(shell git rev-parse --short HEAD) -X 'main.BuildTime=$(shell date '+%Y-%m-%d %H:%M:%S')'"
+
 all: build
 
 build:
 	mkdir -p bin
-	go build -o bin/influx-tool -ldflags "-X main.GitCommit=$(shell git rev-parse HEAD | cut -c 1-7) -X 'main.BuildTime=$(shell date '+%Y-%m-%d %H:%M:%S')'" github.com/chengshiwen/influx-tool
+	$(GO_BUILD)
 
 linux:
-	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bin/influx-tool -ldflags "-s -X main.GitCommit=$(shell git rev-parse HEAD | cut -c 1-7) -X 'main.BuildTime=$(shell date '+%Y-%m-%d %H:%M:%S')'" github.com/chengshiwen/influx-tool
+	$(GO_BUILD)
 
 fmt:
 	find . -name "*.go" -exec go fmt {} \;
