@@ -12,10 +12,11 @@ build:
 	$(GO_BUILD)
 
 linux:
-	$(GO_BUILD)
+	mkdir -p bin
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO_BUILD)
 
 fmt:
-	find . -name "*.go" -exec go fmt {} \;
+	go fmt ./...
 
 clean:
 	rm -rf bin
