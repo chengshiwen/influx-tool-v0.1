@@ -1,3 +1,3 @@
-# influx-tool
+# InfluxDB Tool
 
 Tool for InfluxDB and Influx Proxy
