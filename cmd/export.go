@@ -11,7 +11,6 @@ import (
 
 	"github.com/chengshiwen/influx-tool/backend"
 	"github.com/chengshiwen/influx-tool/util"
-	mapset "github.com/deckarep/golang-set"
 	"github.com/influxdata/influxdb1-client/models"
 	"github.com/influxdata/influxql"
 )
@@ -20,9 +19,9 @@ func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
 	// The SELECT statement returns all field values if all values have the same type.
 	// If field value types differ across shards, InfluxDB first performs any applicable cast operations and
 	// then returns all values with the type that occurs first in the following list: float, integer, string, boolean.
-	fieldSet := make(map[string]mapset.Set, len(fieldKeys))
+	fieldSet := make(map[string]util.Set, len(fieldKeys))
 	for field, types := range fieldKeys {
-		fieldSet[field] = util.NewSetFromStrSlice(types)
+		fieldSet[field] = util.NewSetFromSlice(types)
 	}
 	fieldMap = make(map[string]string, len(fieldKeys))
 	selects := []string{"*"}
@@ -31,9 +30,9 @@ func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
 			fieldMap[field] = types[0]
 		} else {
 			tmap := fieldSet[field]
-			fok := tmap.Contains("float")
-			iok := tmap.Contains("integer")
-			sok := tmap.Contains("string")
+			fok := tmap["float"]
+			iok := tmap["integer"]
+			sok := tmap["string"]
 			if fok || iok {
 				if fok {
 					// force cast to float whether there is an integer
@@ -77,7 +76,7 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 	timeClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
 
 	tagKeys := be.GetTagKeys(db, measurement)
-	tagMap := util.NewSetFromStrSlice(tagKeys)
+	tagMap := util.NewSetFromSlice(tagKeys)
 	fieldKeys := be.GetFieldKeys(db, measurement)
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
@@ -112,7 +111,7 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 		for i := 1; i < len(value); i++ {
 			k := columns[i]
 			v := value[i]
-			if tagMap.Contains(k) {
+			if tagMap[k] {
 				if v != nil {
 					mtagSet = append(mtagSet, fmt.Sprintf("%s=%s", util.EscapeTag(k), util.EscapeTag(v.(string))))
 				}
@@ -150,7 +149,7 @@ func ExportCsv(be *backend.Backend, db, measurement string, start, end int64, di
 	timeClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
 
 	tagKeys := be.GetTagKeys(db, measurement)
-	tagMap := util.NewSetFromStrSlice(tagKeys)
+	tagMap := util.NewSetFromSlice(tagKeys)
 	fieldKeys := be.GetFieldKeys(db, measurement)
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
@@ -194,7 +193,7 @@ func ExportCsv(be *backend.Backend, db, measurement string, start, end int64, di
 		for i := 1; i < len(value); i++ {
 			k := columns[i]
 			v := value[i]
-			if tagMap.Contains(k) {
+			if tagMap[k] {
 				if v != nil {
 					smap[k] = v.(string)
 				} else {

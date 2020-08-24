@@ -3,17 +3,7 @@ package util
 import (
 	"os"
 	"strings"
-
-	mapset "github.com/deckarep/golang-set"
 )
-
-func NewSetFromStrSlice(s []string) mapset.Set {
-	set := mapset.NewSet()
-	for _, v := range s {
-		set.Add(v)
-	}
-	return set
-}
 
 func PathExist(path string) (bool, error) {
 	_, err := os.Stat(path)
