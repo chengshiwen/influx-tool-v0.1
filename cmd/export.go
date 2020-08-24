@@ -1,4 +1,4 @@
-package util
+package cmd
 
 import (
 	"encoding/csv"
@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/chengshiwen/influx-tool/backend"
+	"github.com/chengshiwen/influx-tool/util"
 	mapset "github.com/deckarep/golang-set"
 	"github.com/influxdata/influxdb1-client/models"
 	"github.com/influxdata/influxql"
@@ -21,7 +22,7 @@ func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]stri
 	// then returns all values with the type that occurs first in the following list: float, integer, string, boolean.
 	fieldSet := make(map[string]mapset.Set, len(fieldKeys))
 	for field, types := range fieldKeys {
-		fieldSet[field] = NewSetFromStrSlice(types)
+		fieldSet[field] = util.NewSetFromStrSlice(types)
 	}
 	fieldMap = make(map[string]string, len(fieldKeys))
 	selects := []string{"*"}
@@ -76,7 +77,7 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 	timeClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
 
 	tagKeys := be.GetTagKeys(db, measurement)
-	tagMap := NewSetFromStrSlice(tagKeys)
+	tagMap := util.NewSetFromStrSlice(tagKeys)
 	fieldKeys := be.GetFieldKeys(db, measurement)
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
@@ -106,14 +107,14 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 	}
 	headerTotal := 1 + len(tagKeys) + len(fieldKeys)
 	for _, value := range series[0].Values {
-		mtagSet := []string{EscapeMeasurement(measurement)}
+		mtagSet := []string{util.EscapeMeasurement(measurement)}
 		fieldSet := make([]string, 0)
 		for i := 1; i < len(value); i++ {
 			k := columns[i]
 			v := value[i]
 			if tagMap.Contains(k) {
 				if v != nil {
-					mtagSet = append(mtagSet, fmt.Sprintf("%s=%s", EscapeTag(k), EscapeTag(v.(string))))
+					mtagSet = append(mtagSet, fmt.Sprintf("%s=%s", util.EscapeTag(k), util.EscapeTag(v.(string))))
 				}
 			} else {
 				if i >= headerTotal {
@@ -123,11 +124,11 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 				}
 				if vtype, ok := fieldMap[k]; ok && v != nil {
 					if vtype == "float" || vtype == "boolean" {
-						fieldSet = append(fieldSet, fmt.Sprintf("%s=%v", EscapeTag(k), v))
+						fieldSet = append(fieldSet, fmt.Sprintf("%s=%v", util.EscapeTag(k), v))
 					} else if vtype == "integer" {
-						fieldSet = append(fieldSet, fmt.Sprintf("%s=%vi", EscapeTag(k), v))
+						fieldSet = append(fieldSet, fmt.Sprintf("%s=%vi", util.EscapeTag(k), v))
 					} else if vtype == "string" {
-						fieldSet = append(fieldSet, fmt.Sprintf("%s=\"%s\"", EscapeTag(k), models.EscapeStringField(v.(string))))
+						fieldSet = append(fieldSet, fmt.Sprintf("%s=\"%s\"", util.EscapeTag(k), models.EscapeStringField(v.(string))))
 					}
 				}
 			}
@@ -149,7 +150,7 @@ func ExportCsv(be *backend.Backend, db, measurement string, start, end int64, di
 	timeClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
 
 	tagKeys := be.GetTagKeys(db, measurement)
-	tagMap := NewSetFromStrSlice(tagKeys)
+	tagMap := util.NewSetFromStrSlice(tagKeys)
 	fieldKeys := be.GetFieldKeys(db, measurement)
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 

@@ -1,112 +1,126 @@
 package backend
 
 import (
-	"bytes"
 	"crypto/tls"
+	"errors"
 	"fmt"
-	"io"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/chengshiwen/influx-tool/util"
 	gzip "github.com/klauspost/pgzip"
 )
 
 type Backend struct {
-	Url       string          `json:"url"` // nolint:golint
-	Username  string          `json:"username"`
-	Password  string          `json:"password"`
-	Transport *http.Transport `json:"transport"`
+	Url       string // nolint:golint
+	Username  string
+	Password  string
+	transport *http.Transport
 }
 
-func NewBackend(host string, port int, username string, password string, ssl bool) *Backend {
+func NewBackend(host string, port int, username string, password string, tlsSkip bool) *Backend {
 	url := fmt.Sprintf("http://%s:%d", host, port)
-	if ssl {
+	if tlsSkip {
 		url = fmt.Sprintf("https://%s:%d", host, port)
 	}
 	return &Backend{
 		Url:       url,
 		Username:  username,
 		Password:  password,
-		Transport: NewTransport(ssl),
+		transport: NewTransport(tlsSkip),
 	}
 }
 
-func NewTransport(ssl bool) *http.Transport {
-	return &http.Transport{TLSClientConfig: &tls.Config{InsecureSkipVerify: ssl}}
+func NewTransport(tlsSkip bool) *http.Transport {
+	return &http.Transport{
+		DialContext: (&net.Dialer{
+			Timeout:   time.Second * 30,
+			KeepAlive: time.Second * 30,
+		}).DialContext,
+		MaxIdleConns:          100,
+		MaxIdleConnsPerHost:   100,
+		IdleConnTimeout:       time.Second * 90,
+		TLSHandshakeTimeout:   time.Second * 10,
+		ExpectContinueTimeout: time.Second * 1,
+		TLSClientConfig:       &tls.Config{InsecureSkipVerify: tlsSkip},
+	}
 }
 
-func Compress(buf *bytes.Buffer, p []byte) (err error) {
-	zip := gzip.NewWriter(buf)
-	defer zip.Close()
-	n, err := zip.Write(p)
-	if err != nil {
-		return
+func NewQueryRequest(db, q string) *http.Request {
+	header := http.Header{}
+	header.Set("Accept-Encoding", "gzip")
+	form := url.Values{}
+	form.Set("q", q)
+	if db != "" {
+		form.Set("db", db)
 	}
-	if n != len(p) {
-		err = io.ErrShortWrite
-		return
-	}
-	return
+	return &http.Request{Method: "GET", Form: form, Header: header}
 }
 
-func NewRequest(db, query string) *http.Request {
-	header := map[string][]string{"Accept-Encoding": {"gzip"}}
-	if db == "" {
-		return &http.Request{Form: url.Values{"q": []string{query}}, Header: header}
-	}
-	return &http.Request{Form: url.Values{"db": []string{db}, "q": []string{query}}, Header: header}
-}
-
-func (backend *Backend) Query(req *http.Request) ([]byte, error) {
-	var err error
+func (be *Backend) Query(req *http.Request) (body []byte, err error) {
 	if len(req.Form) == 0 {
 		req.Form = url.Values{}
 	}
 	req.Form.Del("u")
 	req.Form.Del("p")
 	req.ContentLength = 0
-	if backend.Username != "" || backend.Password != "" {
-		req.SetBasicAuth(backend.Username, backend.Password)
+	if be.Username != "" || be.Password != "" {
+		req.SetBasicAuth(be.Username, be.Password)
 	}
 
-	req.URL, err = url.Parse(backend.Url + "/query?" + req.Form.Encode())
+	req.URL, err = url.Parse(be.Url + "/query?" + req.Form.Encode())
 	if err != nil {
 		log.Print("internal url parse error: ", err)
-		return nil, err
+		return
 	}
 
 	q := strings.TrimSpace(req.FormValue("q"))
-	resp, err := backend.Transport.RoundTrip(req)
+	resp, err := be.transport.RoundTrip(req)
 	if err != nil {
 		log.Printf("query error: %s, the query is %s", err, q)
-		return nil, err
+		return
 	}
 	defer resp.Body.Close()
 
 	respBody := resp.Body
 	if resp.Header.Get("Content-Encoding") == "gzip" {
-		respBody, err = gzip.NewReader(resp.Body)
+		b, err := gzip.NewReader(resp.Body)
 		if err != nil {
 			log.Printf("unable to decode gzip body")
 			return nil, err
 		}
-		defer respBody.Close()
+		defer b.Close()
+		respBody = b
 	}
 
-	return ioutil.ReadAll(respBody)
+	body, err = ioutil.ReadAll(respBody)
+	if err != nil {
+		log.Printf("read body error: %s, the query is %s", err, q)
+		return
+	}
+	if resp.StatusCode >= 400 {
+		rsp, _ := ResponseFromResponseBytes(body)
+		err = errors.New(rsp.Err)
+	}
+	return
 }
 
-func (backend *Backend) QueryIQL(db, query string) ([]byte, error) {
-	return backend.Query(NewRequest(db, query))
+func (be *Backend) QueryIQL(db, q string) ([]byte, error) {
+	return be.Query(NewQueryRequest(db, q))
 }
 
-func (backend *Backend) GetSeriesValues(db, query string) []string {
-	p, _ := backend.Query(NewRequest(db, query))
-	series, _ := SeriesFromResponseBytes(p)
+func (be *Backend) GetSeriesValues(db, q string) []string {
 	var values []string
+	p, err := be.Query(NewQueryRequest(db, q))
+	if err != nil {
+		return values
+	}
+	series, _ := SeriesFromResponseBytes(p)
 	for _, s := range series {
 		for _, v := range s.Values {
 			if s.Name == "databases" && v[0].(string) == "_internal" {
@@ -118,19 +132,22 @@ func (backend *Backend) GetSeriesValues(db, query string) []string {
 	return values
 }
 
-func (backend *Backend) GetMeasurements(db string) []string {
-	return backend.GetSeriesValues(db, "show measurements")
+func (be *Backend) GetMeasurements(db string) []string {
+	return be.GetSeriesValues(db, "show measurements")
 }
 
-func (backend *Backend) GetTagKeys(db, measure string) []string {
-	return backend.GetSeriesValues(db, fmt.Sprintf("show tag keys from \"%s\"", measure))
+func (be *Backend) GetTagKeys(db, meas string) []string {
+	return be.GetSeriesValues(db, fmt.Sprintf("show tag keys from \"%s\"", util.EscapeIdentifier(meas)))
 }
 
-func (backend *Backend) GetFieldKeys(db, measure string) map[string][]string {
-	query := fmt.Sprintf("show field keys from \"%s\"", measure)
-	p, _ := backend.Query(NewRequest(db, query))
-	series, _ := SeriesFromResponseBytes(p)
+func (be *Backend) GetFieldKeys(db, meas string) map[string][]string {
 	fieldKeys := make(map[string][]string)
+	q := fmt.Sprintf("show field keys from \"%s\"", util.EscapeIdentifier(meas))
+	p, err := be.Query(NewQueryRequest(db, q))
+	if err != nil {
+		return fieldKeys
+	}
+	series, _ := SeriesFromResponseBytes(p)
 	for _, s := range series {
 		for _, v := range s.Values {
 			fk := v[0].(string)

@@ -30,46 +30,49 @@ type Response struct {
 }
 
 func SeriesFromResponseBytes(b []byte) (series models.Rows, e error) {
-	var rsp Response
-	e = jsoniter.Unmarshal(b, &rsp)
+	rsp := &Response{}
+	e = jsoniter.Unmarshal(b, rsp)
 	if e == nil && len(rsp.Results) > 0 && len(rsp.Results[0].Series) > 0 {
 		series = rsp.Results[0].Series
 	}
 	return
 }
 
-func ResponseBytesFromSeries(series models.Rows) (b []byte, e error) {
-	r := &Result{
-		Series: series,
-	}
-	rsp := Response{
-		Results: []*Result{r},
-	}
-	b, e = jsoniter.Marshal(rsp)
-	if e != nil {
-		return
-	}
-	b = append(b, '\n')
-	return
-}
-
 func ResultsFromResponseBytes(b []byte) (results []*Result, e error) {
-	var rsp Response
-	e = jsoniter.Unmarshal(b, &rsp)
+	rsp := &Response{}
+	e = jsoniter.Unmarshal(b, rsp)
 	if e == nil && len(rsp.Results) > 0 {
 		results = rsp.Results
 	}
 	return
 }
 
-func ResponseBytesFromResults(results []*Result) (b []byte, e error) {
-	rsp := Response{
+func ResponseFromResponseBytes(b []byte) (rsp *Response, e error) {
+	rsp = &Response{}
+	e = jsoniter.Unmarshal(b, rsp)
+	return
+}
+
+func ResponseFromSeries(series models.Rows) (rsp *Response) {
+	r := &Result{
+		Series: series,
+	}
+	rsp = &Response{
+		Results: []*Result{r},
+	}
+	return
+}
+
+func ResponseFromResults(results []*Result) (rsp *Response) {
+	rsp = &Response{
 		Results: results,
 	}
-	b, e = jsoniter.Marshal(rsp)
-	if e != nil {
-		return
+	return
+}
+
+func ResponseFromError(err string) (rsp *Response) {
+	rsp = &Response{
+		Err: err,
 	}
-	b = append(b, '\n')
 	return
 }

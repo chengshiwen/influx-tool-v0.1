@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/chengshiwen/influx-tool/backend"
+	"github.com/chengshiwen/influx-tool/cmd"
 	"github.com/chengshiwen/influx-tool/util"
 	"github.com/panjf2000/ants/v2"
 )
@@ -177,9 +178,9 @@ func main() {
 		Pool.Submit(func() {
 			defer Wg.Done()
 			if Format == "csv" {
-				util.ExportCsv(backend, Database, _measurement, StartTime, EndTime, Dir, castFields)
+				cmd.ExportCsv(backend, Database, _measurement, StartTime, EndTime, Dir, castFields)
 			} else {
-				util.Export(backend, Database, _measurement, StartTime, EndTime, Dir, castFields, Merge)
+				cmd.Export(backend, Database, _measurement, StartTime, EndTime, Dir, castFields, Merge)
 			}
 			fmt.Printf("%d/%d: %s processed\n", _i+1, len(measurements), _measurement)
 		})
@@ -187,7 +188,7 @@ func main() {
 	Wg.Wait()
 	fmt.Printf("%d/%d measurements export done\n", cnt, len(measurements))
 	if Format == "line" && Merge {
-		ioutil.WriteFile(filepath.Join(Dir, "merge.tmp"), []byte(util.GetDMLHeader(Database)+"\n"), 0644)
+		ioutil.WriteFile(filepath.Join(Dir, "merge.tmp"), []byte(cmd.GetDMLHeader(Database)+"\n"), 0644)
 		err := exec.Command("sh", "-c", fmt.Sprintf("cat %s >> %s", filepath.Join(Dir, "*.txt"), filepath.Join(Dir, "merge.tmp"))).Run()
 		if err != nil {
 			fmt.Printf("merge error: %s\n", err)
