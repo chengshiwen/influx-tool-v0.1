@@ -72,15 +72,14 @@ func GetDMLHeader(db string) string {
 	}, "\n")
 }
 
-func Export(be *backend.Backend, db, measurement string, start, end int64, dir string, castFields map[string][]string, merge bool) (err error) {
-	timeClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
-
-	tagKeys := be.GetTagKeys(db, measurement)
+func Export(be *backend.Backend, db, meas string, start, end int64, dir string, castFields map[string][]string, merge bool) (err error) {
+	tagKeys := be.GetTagKeys(db, meas)
 	tagMap := util.NewSetFromSlice(tagKeys)
-	fieldKeys := be.GetFieldKeys(db, measurement)
+	fieldKeys := be.GetFieldKeys(db, meas)
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
-	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\" %s", keyClause, measurement, timeClause))
+	whereClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
+	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\" %s", keyClause, util.EscapeIdentifier(meas), whereClause))
 	if err != nil {
 		return
 	}
@@ -89,14 +88,14 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 		return
 	}
 	if len(series) < 1 {
-		fmt.Printf("select empty data from %s on %s\n", db, measurement)
+		fmt.Printf("select empty data from %s on %s\n", db, meas)
 		return
 	}
 	columns := series[0].Columns
 
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("multi data type error from %s on %s: %s\n", err, db, measurement)
+			fmt.Printf("multi data type error from %s on %s: %s\n", err, db, meas)
 		}
 	}()
 
@@ -106,7 +105,7 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 	}
 	headerTotal := 1 + len(tagKeys) + len(fieldKeys)
 	for _, value := range series[0].Values {
-		mtagSet := []string{util.EscapeMeasurement(measurement)}
+		mtagSet := []string{util.EscapeMeasurement(meas)}
 		fieldSet := make([]string, 0)
 		for i := 1; i < len(value); i++ {
 			k := columns[i]
@@ -140,20 +139,19 @@ func Export(be *backend.Backend, db, measurement string, start, end int64, dir s
 	}
 	if len(lines) != 0 {
 		data := []byte(strings.Join(lines, "\n") + "\n")
-		ioutil.WriteFile(filepath.Join(dir, measurement+".txt"), data, 0644)
+		ioutil.WriteFile(filepath.Join(dir, meas+".txt"), data, 0644)
 	}
 	return
 }
 
-func ExportCsv(be *backend.Backend, db, measurement string, start, end int64, dir string, castFields map[string][]string) (err error) {
-	timeClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
-
-	tagKeys := be.GetTagKeys(db, measurement)
+func ExportCsv(be *backend.Backend, db, meas string, start, end int64, dir string, castFields map[string][]string) (err error) {
+	tagKeys := be.GetTagKeys(db, meas)
 	tagMap := util.NewSetFromSlice(tagKeys)
-	fieldKeys := be.GetFieldKeys(db, measurement)
+	fieldKeys := be.GetFieldKeys(db, meas)
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
-	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\" %s", keyClause, measurement, timeClause))
+	whereClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
+	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\" %s", keyClause, util.EscapeIdentifier(meas), whereClause))
 	if err != nil {
 		return
 	}
@@ -162,18 +160,18 @@ func ExportCsv(be *backend.Backend, db, measurement string, start, end int64, di
 		return
 	}
 	if len(series) < 1 {
-		fmt.Printf("select empty data from %s on %s\n", db, measurement)
+		fmt.Printf("select empty data from %s on %s\n", db, meas)
 		return
 	}
 	columns := series[0].Columns
 
 	defer func() {
 		if err := recover(); err != nil {
-			fmt.Printf("export panic from %s on %s: %s\n", err, db, measurement)
+			fmt.Printf("export panic from %s on %s: %s\n", err, db, meas)
 		}
 	}()
 
-	w, err := os.Create(filepath.Join(dir, measurement+".csv"))
+	w, err := os.Create(filepath.Join(dir, meas+".csv"))
 	if err != nil {
 		panic(err)
 	}
@@ -187,7 +185,7 @@ func ExportCsv(be *backend.Backend, db, measurement string, start, end int64, di
 	for _, value := range series[0].Values {
 		records := make([]string, 0, headerTotal+1)
 		ts, _ := time.Parse(time.RFC3339Nano, value[0].(string))
-		records = append(records, measurement)
+		records = append(records, meas)
 		records = append(records, fmt.Sprintf("%d", ts.UnixNano()))
 		smap := make(map[string]string, len(tagKeys)+len(fieldKeys))
 		for i := 1; i < len(value); i++ {
