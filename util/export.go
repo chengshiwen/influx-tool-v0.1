@@ -3,15 +3,16 @@ package util
 import (
 	"encoding/csv"
 	"fmt"
-	"github.com/chengshiwen/influx-tool/backend"
-	"github.com/deckarep/golang-set"
-	"github.com/influxdata/influxdb1-client/models"
-	"github.com/influxdata/influxql"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/chengshiwen/influx-tool/backend"
+	mapset "github.com/deckarep/golang-set"
+	"github.com/influxdata/influxdb1-client/models"
+	"github.com/influxdata/influxql"
 )
 
 func reformFieldKeys(fieldKeys map[string][]string, castFields map[string][]string) (fieldMap map[string]string, keyClause string) {

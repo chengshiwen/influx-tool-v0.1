@@ -1,9 +1,10 @@
 package util
 
 import (
-	"github.com/deckarep/golang-set"
 	"os"
 	"strings"
+
+	mapset "github.com/deckarep/golang-set"
 )
 
 func NewSetFromStrSlice(s []string) mapset.Set {

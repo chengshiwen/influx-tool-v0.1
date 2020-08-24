@@ -4,17 +4,18 @@ import (
 	"bytes"
 	"crypto/tls"
 	"fmt"
-	gzip "github.com/klauspost/pgzip"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
 	"net/url"
 	"strings"
+
+	gzip "github.com/klauspost/pgzip"
 )
 
 type Backend struct {
-	Url       string          `json:"url"`
+	Url       string          `json:"url"` // nolint:golint
 	Username  string          `json:"username"`
 	Password  string          `json:"password"`
 	Transport *http.Transport `json:"transport"`
@@ -88,11 +89,11 @@ func (backend *Backend) Query(req *http.Request) ([]byte, error) {
 	respBody := resp.Body
 	if resp.Header.Get("Content-Encoding") == "gzip" {
 		respBody, err = gzip.NewReader(resp.Body)
-		defer respBody.Close()
 		if err != nil {
 			log.Printf("unable to decode gzip body")
 			return nil, err
 		}
+		defer respBody.Close()
 	}
 
 	return ioutil.ReadAll(respBody)

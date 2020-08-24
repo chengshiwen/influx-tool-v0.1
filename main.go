@@ -3,9 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/chengshiwen/influx-tool/backend"
-	"github.com/chengshiwen/influx-tool/util"
-	"github.com/panjf2000/ants/v2"
 	"io/ioutil"
 	"math"
 	"os/exec"
@@ -15,6 +12,10 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+
+	"github.com/chengshiwen/influx-tool/backend"
+	"github.com/chengshiwen/influx-tool/util"
+	"github.com/panjf2000/ants/v2"
 )
 
 var (
@@ -39,7 +40,7 @@ var (
 	GitCommit     string
 	BuildTime     string
 	Pool          *ants.Pool
-	Wg            *sync.WaitGroup
+	Wg            sync.WaitGroup
 )
 
 func castFields() map[string][]string {
@@ -107,7 +108,7 @@ func main() {
 	rangeStart := 1
 	rangeEnd := math.MaxUint32
 	if Measurements == "" && Range != "" {
-		pattern, _ := regexp.Compile("^(\\d*),(\\d*)$")
+		pattern, _ := regexp.Compile(`^(\d*),(\d*)$`)
 		matches := pattern.FindStringSubmatch(Range)
 		if len(matches) != 3 {
 			fmt.Println("invalid range")
@@ -164,9 +165,8 @@ func main() {
 	castFields := castFields()
 
 	cnt := 0
-	Pool, _ := ants.NewPool(Worker)
+	Pool, _ = ants.NewPool(Worker)
 	defer Pool.Release()
-	Wg := &sync.WaitGroup{}
 	for i, measurement := range measurements {
 		_i, _measurement := i, measurement
 		if Range != "" && (_i < rangeStart-1 || _i >= rangeEnd) {

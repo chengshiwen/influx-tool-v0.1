@@ -15,11 +15,13 @@ linux:
 	mkdir -p bin
 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 $(GO_BUILD)
 
-fmt:
+lint:
+	golangci-lint run --enable=golint --disable=errcheck --disable=typecheck
+	goimports -l -w .
 	go fmt ./...
+	go vet ./...
 
 clean:
 	rm -rf bin
-
 
 ### Makefile ends here
