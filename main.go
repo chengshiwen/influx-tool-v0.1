@@ -19,6 +19,10 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
+const (
+	VERSION = "0.1.8"
+)
+
 var (
 	Host          string
 	Port          int
@@ -81,10 +85,10 @@ func main() {
 	flag.BoolVar(&Version, "version", false, "display the version and exit")
 	flag.Parse()
 	if Version {
-		fmt.Printf("Version:    %s\n", "0.1.8")
+		fmt.Printf("Version:    %s\n", VERSION)
 		fmt.Printf("Git commit: %s\n", GitCommit)
-		fmt.Printf("Go version: %s\n", runtime.Version())
 		fmt.Printf("Build time: %s\n", BuildTime)
+		fmt.Printf("Go version: %s\n", runtime.Version())
 		fmt.Printf("OS/Arch:    %s/%s\n", runtime.GOOS, runtime.GOARCH)
 		return
 	}
