@@ -51,7 +51,7 @@ func NewTransport(tlsSkip bool) *http.Transport {
 	}
 }
 
-func NewQueryRequest(db, q string) *http.Request {
+func NewQueryRequest(method, db, q, epoch string) *http.Request {
 	header := http.Header{}
 	header.Set("Accept-Encoding", "gzip")
 	form := url.Values{}
@@ -59,7 +59,10 @@ func NewQueryRequest(db, q string) *http.Request {
 	if db != "" {
 		form.Set("db", db)
 	}
-	return &http.Request{Method: "GET", Form: form, Header: header}
+	if epoch != "" {
+		form.Set("epoch", epoch)
+	}
+	return &http.Request{Method: method, Form: form, Header: header}
 }
 
 func (be *Backend) Query(req *http.Request) (body []byte, err error) {
@@ -110,13 +113,13 @@ func (be *Backend) Query(req *http.Request) (body []byte, err error) {
 	return
 }
 
-func (be *Backend) QueryIQL(db, q string) ([]byte, error) {
-	return be.Query(NewQueryRequest(db, q))
+func (be *Backend) QueryIQL(method, db, q, epoch string) ([]byte, error) {
+	return be.Query(NewQueryRequest(method, db, q, epoch))
 }
 
 func (be *Backend) GetSeriesValues(db, q string) []string {
 	var values []string
-	p, err := be.Query(NewQueryRequest(db, q))
+	p, err := be.Query(NewQueryRequest("GET", db, q, ""))
 	if err != nil {
 		return values
 	}
@@ -143,7 +146,7 @@ func (be *Backend) GetTagKeys(db, meas string) []string {
 func (be *Backend) GetFieldKeys(db, meas string) map[string][]string {
 	fieldKeys := make(map[string][]string)
 	q := fmt.Sprintf("show field keys from \"%s\"", util.EscapeIdentifier(meas))
-	p, err := be.Query(NewQueryRequest(db, q))
+	p, err := be.Query(NewQueryRequest("GET", db, q, ""))
 	if err != nil {
 		return fieldKeys
 	}

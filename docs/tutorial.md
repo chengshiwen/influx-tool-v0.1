@@ -56,10 +56,10 @@ Usage of ./influx-tool:
 
 ```
 $ ./influx-tool -version
-Version:    0.1.8
-Git commit: 76e4a95
-Go version: go1.14.6
-Build time: 2020-08-02 17:27:33
+Version:    0.1.9
+Git commit: 12f69c6
+Build time: 2020-11-18 18:33:51
+Go version: go1.14.12
 OS/Arch:    linux/amd64
 ```
 
@@ -140,3 +140,10 @@ OS/Arch:    linux/amd64
 
 > - 提升导出数据的性能
 > - -cpu 选项调整为 -worker 选项，默认值为 1
+
+#### v0.1.9
+
+> - 修复大整数 int64 转换为 float64 时可能导致精度损失的问题
+> - 修复含特殊字符的 measurement 可能导致无法导出的问题
+> - 提升时间字符串解析的性能
+> - 升级依赖库、移除无用库，增加语法错误检查

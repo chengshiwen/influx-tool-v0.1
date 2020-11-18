@@ -7,7 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 
 	"github.com/chengshiwen/influx-tool/backend"
 	"github.com/chengshiwen/influx-tool/util"
@@ -79,7 +78,8 @@ func Export(be *backend.Backend, db, meas string, start, end int64, dir string, 
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
 	whereClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
-	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\" %s", keyClause, util.EscapeIdentifier(meas), whereClause))
+	q := fmt.Sprintf("select %s from \"%s\" %s", keyClause, util.EscapeIdentifier(meas), whereClause)
+	rsp, err := be.QueryIQL("GET", db, q, "ns")
 	if err != nil {
 		return
 	}
@@ -133,8 +133,7 @@ func Export(be *backend.Backend, db, meas string, start, end int64, dir string, 
 		}
 		mtagStr := strings.Join(mtagSet, ",")
 		fieldStr := strings.Join(fieldSet, ",")
-		ts, _ := time.Parse(time.RFC3339Nano, value[0].(string))
-		line := fmt.Sprintf("%s %s %d", mtagStr, fieldStr, ts.UnixNano())
+		line := fmt.Sprintf("%s %s %v\n", mtagStr, fieldStr, value[0])
 		lines = append(lines, line)
 	}
 	if len(lines) != 0 {
@@ -151,7 +150,8 @@ func ExportCsv(be *backend.Backend, db, meas string, start, end int64, dir strin
 	fieldMap, keyClause := reformFieldKeys(fieldKeys, castFields)
 
 	whereClause := fmt.Sprintf("where time >= %ds and time <= %ds", start, end)
-	rsp, err := be.QueryIQL(db, fmt.Sprintf("select %s from \"%s\" %s", keyClause, util.EscapeIdentifier(meas), whereClause))
+	q := fmt.Sprintf("select %s from \"%s\" %s", keyClause, util.EscapeIdentifier(meas), whereClause)
+	rsp, err := be.QueryIQL("GET", db, q, "ns")
 	if err != nil {
 		return
 	}
@@ -184,9 +184,8 @@ func ExportCsv(be *backend.Backend, db, meas string, start, end int64, dir strin
 
 	for _, value := range series[0].Values {
 		records := make([]string, 0, headerTotal+1)
-		ts, _ := time.Parse(time.RFC3339Nano, value[0].(string))
 		records = append(records, meas)
-		records = append(records, fmt.Sprintf("%d", ts.UnixNano()))
+		records = append(records, fmt.Sprintf("%v", value[0]))
 		smap := make(map[string]string, len(tagKeys)+len(fieldKeys))
 		for i := 1; i < len(value); i++ {
 			k := columns[i]
