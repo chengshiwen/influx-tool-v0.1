@@ -1,19 +1,39 @@
-### Makefile ---
+# Makefile
 
-## Author: Shiwen Cheng
-## Copyright: 2020, <chengshiwen0103@gmail.com>
+VERSION     := 0.1.9
+LDFLAGS     ?= "-s -w -X main.Version=$(VERSION) -X main.GitCommit=$(shell git rev-parse --short HEAD) -X 'main.BuildTime=$(shell date '+%Y-%m-%d %H:%M:%S')'"
+GOBUILD_ENV = GO111MODULE=on CGO_ENABLED=0
+GOBUILD     = go build -o bin/influx-tool -a -ldflags $(LDFLAGS)
+GOX         = go run github.com/mitchellh/gox
+TARGETS     := darwin/amd64 linux/amd64 windows/amd64
+DIST_DIRS   := find * -maxdepth 0 -type d -exec
 
-export GO_BUILD=GO111MODULE=on CGO_ENABLED=0 go build -o bin/influx-tool -ldflags "-s -w -X main.GitCommit=$(shell git rev-parse --short HEAD) -X 'main.BuildTime=$(shell date '+%Y-%m-%d %H:%M:%S')'"
-
-.PHONY: build linux lint down tidy clean
+.PHONY: build linux cross-build release test lint down tidy clean
 
 all: build
 
 build:
-	$(GO_BUILD)
+	$(GOBUILD_ENV) $(GOBUILD)
 
 linux:
-	GOOS=linux GOARCH=amd64 $(GO_BUILD)
+	GOOS=linux GOARCH=amd64 $(GOBUILD_ENV) $(GOBUILD)
+
+cross-build: clean
+	$(GOBUILD_ENV) $(GOX) -ldflags $(LDFLAGS) -parallel=3 -output="bin/influx-tool-$(VERSION)-{{.OS}}-{{.Arch}}/influx-tool" -osarch='$(TARGETS)' .
+
+release: cross-build
+	( \
+		cd bin && \
+		$(DIST_DIRS) cp ../LICENSE {} \; && \
+		$(DIST_DIRS) cp ../README.md {} \; && \
+		$(DIST_DIRS) tar -zcf {}.tar.gz {} \; && \
+		$(DIST_DIRS) zip -r {}.zip {} \; && \
+		$(DIST_DIRS) rm -rf {} \; && \
+		sha256sum * > sha256sums.txt \
+	)
+
+test:
+	go test -v ./...
 
 lint:
 	golangci-lint run --enable=golint --disable=errcheck --disable=typecheck && goimports -l -w . && go fmt ./... && go vet ./...
@@ -22,9 +42,7 @@ down:
 	go list ./... && go mod verify
 
 tidy:
-	head -n 3 go.mod > go.mod.tmp && mv go.mod.tmp go.mod && rm -f go.sum && go mod tidy -v
+	rm -f go.sum && go mod tidy -v
 
 clean:
 	rm -rf bin
-
-### Makefile ends here

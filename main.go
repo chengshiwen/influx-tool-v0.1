@@ -19,8 +19,10 @@ import (
 	"github.com/panjf2000/ants/v2"
 )
 
-const (
-	VERSION = "0.1.9"
+var (
+	Version   = "unknown"
+	GitCommit = "unknown"
+	BuildTime = "unknown"
 )
 
 var (
@@ -41,9 +43,7 @@ var (
 	BooleanFields string
 	FloatFields   string
 	IntegerFields string
-	Version       bool
-	GitCommit     string
-	BuildTime     string
+	VersionFlag   bool
 	Pool          *ants.Pool
 	Wg            sync.WaitGroup
 )
@@ -82,10 +82,10 @@ func main() {
 	flag.StringVar(&BooleanFields, "boolean-fields", "", "fields required to cast to boolean from string, split by ','")
 	flag.StringVar(&FloatFields, "float-fields", "", "fields required to cast to float from string, split by ','")
 	flag.StringVar(&IntegerFields, "integer-fields", "", "fields required to cast to integer from string, split by ','")
-	flag.BoolVar(&Version, "version", false, "display the version and exit")
+	flag.BoolVar(&VersionFlag, "version", false, "display the version and exit")
 	flag.Parse()
-	if Version {
-		fmt.Printf("Version:    %s\n", VERSION)
+	if VersionFlag {
+		fmt.Printf("Version:    %s\n", Version)
 		fmt.Printf("Git commit: %s\n", GitCommit)
 		fmt.Printf("Build time: %s\n", BuildTime)
 		fmt.Printf("Go version: %s\n", runtime.Version())
